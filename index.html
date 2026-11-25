@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fuel Tracker">
+<meta name="theme-color" content="#0b0b0f">
+<title>Fuel Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    color-scheme: dark;
+    --red: #e2483d;
+    --red-dark: #b53328;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0b0b0f;
+    color: #f2f2f2;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 18px;
+  }
+  body {
+    padding: calc(env(safe-area-inset-top) + 1.5rem) 1.25rem calc(env(safe-area-inset-bottom) + 2rem);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 1.6rem;
+    margin: 0 0 0.25rem;
+  }
+  .sub {
+    color: #999;
+    margin: 0 0 1.5rem;
+    font-size: 0.95rem;
+  }
+  .card {
+    background: #17171d;
+    border: 1px solid #26262e;
+    border-radius: 16px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .card.in-view { opacity: 1; transform: translateY(0); }
+  .card h2 {
+    font-size: 1.05rem;
+    margin: 0 0 0.75rem;
+    color: #ccc;
+  }
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  .metric {
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--red);
+  }
+  .metric-label {
+    color: #999;
+    font-size: 0.85rem;
+    margin-top: 0.15rem;
+  }
+  .metric-sub {
+    color: #999;
+    font-size: 0.9rem;
+    margin-top: 0.35rem;
+  }
+  form { display: flex; flex-direction: column; gap: 0.9rem; }
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.95rem;
+    color: #bbb;
+  }
+  input[type="number"], input[type="text"] {
+    font-size: 1.1rem;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    border: 1px solid #2e2e38;
+    background: #0f0f14;
+    color: #fff;
+    width: 100%;
+    -webkit-appearance: none;
+  }
+  input:focus {
+    outline: 2px solid var(--red);
+  }
+  button {
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 0.95rem 1rem;
+    min-height: 52px;
+    border-radius: 12px;
+    border: none;
+    background: var(--red);
+    color: #fff;
+    cursor: pointer;
+  }
+  button:active { background: var(--red-dark); }
+  .entries { display: flex; flex-direction: column; gap: 0.6rem; }
+  .entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    background: #101015;
+    border: 1px solid #24242c;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+  }
+  .entry-main { flex: 1; min-width: 0; }
+  .entry-date { font-size: 0.85rem; color: #999; }
+  .entry-mileage {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-top: 0.15rem;
+    color: var(--red);
+  }
+  .entry-main details {
+    margin-top: 0.35rem;
+  }
+  .entry-main summary {
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--red);
+  }
+  .entry-calc {
+    margin-top: 0.4rem;
+    font-size: 0.85rem;
+    color: #999;
+    line-height: 1.6;
+  }
+  .del-btn {
+    flex-shrink: 0;
+    min-height: 40px;
+    min-width: 40px;
+    padding: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    background: #2a1414;
+    color: #ff8080;
+    border: 1px solid #3a1c1c;
+    border-radius: 10px;
+  }
+  .empty {
+    color: #777;
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 1rem 0;
+  }
+  .error-banner {
+    background: #2a1414;
+    border: 1px solid #3a1c1c;
+    color: #ff8080;
+    font-size: 0.9rem;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    margin-bottom: 1.25rem;
+  }
+  .loading {
+    color: #777;
+    font-size: 0.95rem;
+    text-align: center;
+    padding: 2rem 0;
+  }
+  .chart-wrap { position: relative; height: 180px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+  <div id="error-banner" class="error-banner" hidden></div>
+
+  <h1>Fuel Tracker</h1>
+  <p class="sub" id="active-sub">Mileage and fuel spend, tracked at the pump.</p>
+
+  <div id="loading" class="loading">Loading…</div>
+
+  <div id="onboarding-card" class="card" hidden>
+    <h2>Set up your car</h2>
+    <form id="onboarding-form">
+      <label>Car name
+        <input type="text" id="onboarding-name" value="Grand i10" required>
+      </label>
+      <label>Starting odometer (km)
+        <input type="number" id="onboarding-odometer" min="0" inputmode="numeric" required>
+      </label>
+      <label>Starting fuel level (%)
+        <input type="number" id="onboarding-fuel" min="0" max="100" inputmode="numeric" required>
+      </label>
+      <button type="submit">Save &amp; Start</button>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <div class="card">
+      <h2 id="car-title">Overview</h2>
+      <div class="metrics-grid">
+        <div>
+          <div class="metric" id="metric-mileage">—</div>
+          <div class="metric-label">avg km/l</div>
+        </div>
+        <div>
+          <div class="metric" id="metric-spent">—</div>
+          <div class="metric-label">total spent</div>
+        </div>
+      </div>
+      <div class="metric-sub" id="metric-distance"></div>
+    </div>
+
+    <div class="card">
+      <h2>Mileage over time</h2>
+      <div id="chart-empty" class="empty" hidden>Log a fill-up to see the trend.</div>
+      <div class="chart-wrap"><canvas id="mileage-chart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h2>Log a fill-up</h2>
+      <form id="fillup-form">
+        <label>Odometer now (km)
+          <input type="number" id="fillup-odometer" min="0" inputmode="numeric" required>
+        </label>
+        <label>Liters filled
+          <input type="number" id="fillup-liters" step="0.01" min="0.01" inputmode="decimal" required>
+        </label>
+        <label>Cost (₹)
+          <input type="number" id="fillup-cost" step="0.01" min="0" inputmode="decimal" required>
+        </label>
+        <button type="submit">Add Fill-up</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <div id="entries-list" class="entries"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script>
+    var API_KEY = "{{ api_key }}";
+    var PROJECT = "{{ project }}";
+    var API_BASE = "/api/" + PROJECT;
+
+    var state = { row: null };
+    var chart = null;
+    var animInit = false;
+
+    function genId() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
+    function todayStr() {
+      var d = new Date();
+      var y = d.getFullYear();
+      var m = String(d.getMonth() + 1).padStart(2, '0');
+      var day = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + day;
+    }
+
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // --- storage (backed by raj-backend's generic rows API) ---
+
+    function apiHeaders(extra) {
+      var h = { 'X-API-Key': API_KEY };
+      if (extra) {
+        for (var k in extra) h[k] = extra[k];
+      }
+      return h;
+    }
+
+    function apiFetch(path, options) {
+      return fetch(API_BASE + path, options).then(function (r) {
+        if (!r.ok) throw new Error('Request failed (' + r.status + ')');
+        if (r.status === 204) return null;
+        return r.json();
+      });
+    }
+
+    function fetchCar() {
+      return apiFetch('/car/rows?limit=1', { headers: apiHeaders() });
+    }
+
+    function createCar(data) {
+      return apiFetch('/car/rows', {
+        method: 'POST',
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data)
+      });
+    }
+
+    function saveCarData(id, data) {
+      return apiFetch('/car/rows/' + id, {
+        method: 'PUT',
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data)
+      });
+    }
+
+    function showError(message) {
+      var el = document.getElementById('error-banner');
+      el.textContent = message;
+      el.hidden = false;
+    }
+    function clearError() {
+      document.getElementById('error-banner').hidden = true;
+    }
+
+    // --- calculations ---
+
+    function computeStats(data) {
+      var prevOdo = data.startingOdometer;
+      var totalDistance = 0, totalLiters = 0, totalCost = 0;
+      var stats = data.fillups.map(function (f) {
+        var distance = f.odometer - prevOdo;
+        var mileage = distance > 0 ? distance / f.liters : null;
+        prevOdo = f.odometer;
+        if (distance > 0) totalDistance += distance;
+        totalLiters += f.liters;
+        totalCost += f.cost;
+        return {
+          id: f.id, date: f.date, odometer: f.odometer, liters: f.liters, cost: f.cost,
+          distance: distance, mileage: mileage
+        };
+      });
+      var avgMileage = totalLiters > 0 ? totalDistance / totalLiters : null;
+      return { stats: stats, totalDistance: totalDistance, totalLiters: totalLiters, totalCost: totalCost, avgMileage: avgMileage };
+    }
+
+    // --- rendering ---
+
+    function renderOverview(data, computed) {
+      document.getElementById('car-title').textContent = data.name;
+      document.getElementById('metric-mileage').textContent = computed.avgMileage != null ? computed.avgMileage.toFixed(1) : '—';
+      document.getElementById('metric-spent').textContent = '₹' + Math.round(computed.totalCost).toLocaleString('en-IN');
+      document.getElementById('metric-distance').textContent = computed.totalDistance > 0
+        ? computed.totalDistance.toLocaleString('en-IN') + ' km covered · ' + computed.totalLiters.toFixed(1) + ' L filled'
+        : 'Log a fill-up to start tracking mileage.';
+    }
+
+    function renderChart(computed) {
+      var withMileage = computed.stats.filter(function (s) { return s.mileage != null; });
+      document.getElementById('chart-empty').hidden = withMileage.length > 0;
+      var ctx = document.getElementById('mileage-chart');
+      if (chart) { chart.destroy(); chart = null; }
+      if (!withMileage.length) return;
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: withMileage.map(function (s) { return s.date; }),
+          datasets: [{
+            label: 'km/l',
+            data: withMileage.map(function (s) { return Number(s.mileage.toFixed(1)); }),
+            borderColor: '#e2483d',
+            backgroundColor: 'rgba(226,72,61,0.15)',
+            pointBackgroundColor: '#e2483d',
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#999', maxTicksLimit: 5 }, grid: { color: '#22222a' } },
+            y: { ticks: { color: '#999' }, grid: { color: '#22222a' } }
+          }
+        }
+      });
+    }
+
+    function renderEntries(computed) {
+      var list = document.getElementById('entries-list');
+      if (!computed.stats.length) {
+        list.innerHTML = '<div class="empty">No fill-ups logged yet.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      for (var i = computed.stats.length - 1; i >= 0; i--) {
+        (function (entry) {
+          var row = document.createElement('div');
+          row.className = 'entry';
+          var mileageLabel = entry.mileage != null ? entry.mileage.toFixed(1) + ' km/l' : '—';
+          row.innerHTML =
+            '<div class="entry-main">' +
+              '<div class="entry-date">' + entry.date + '</div>' +
+              '<div class="entry-mileage">' + mileageLabel + '</div>' +
+              '<details>' +
+                '<summary>View</summary>' +
+                '<div class="entry-calc">' +
+                  'Odometer: ' + entry.odometer.toLocaleString('en-IN') + ' km<br>' +
+                  'Distance since last: ' + entry.distance.toLocaleString('en-IN') + ' km<br>' +
+                  'Liters filled: ' + entry.liters.toFixed(2) + ' L<br>' +
+                  'Cost: ₹' + entry.cost.toFixed(2) +
+                '</div>' +
+              '</details>' +
+            '</div>' +
+            '<button class="del-btn" aria-label="Delete entry">×</button>';
+          row.querySelector('.del-btn').addEventListener('click', function () {
+            var data = state.row.data;
+            var newData = {
+              name: data.name,
+              startingOdometer: data.startingOdometer,
+              startingFuelPercent: data.startingFuelPercent,
+              setupDate: data.setupDate,
+              fillups: data.fillups.filter(function (f) { return f.id !== entry.id; })
+            };
+            persistCarData(newData, renderAll);
+          });
+          list.appendChild(row);
+        })(computed.stats[i]);
+      }
+    }
+
+    function renderAll() {
+      var data = state.row.data;
+      var computed = computeStats(data);
+      renderOverview(data, computed);
+      renderChart(computed);
+      renderEntries(computed);
+      initScrollAnim();
+    }
+
+    function initScrollAnim() {
+      if (animInit) return;
+      animInit = true;
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            e.target.classList.add('in-view');
+            obs.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.15 });
+      document.querySelectorAll('.card').forEach(function (c) { obs.observe(c); });
+    }
+
+    function persistCarData(newData, onSuccess) {
+      clearError();
+      saveCarData(state.row.id, newData).then(function (row) {
+        state.row = row;
+        onSuccess();
+      }).catch(function (err) {
+        showError('Could not save: ' + err.message);
+      });
+    }
+
+    function showApp() {
+      document.getElementById('onboarding-card').hidden = true;
+      document.getElementById('app').hidden = false;
+      renderAll();
+    }
+
+    function showOnboarding() {
+      document.getElementById('app').hidden = true;
+      document.getElementById('onboarding-card').hidden = false;
+      initScrollAnim();
+    }
+
+    function init() {
+      fetchCar().then(function (rows) {
+        document.getElementById('loading').hidden = true;
+        if (rows && rows.length) {
+          state.row = rows[0];
+          showApp();
+        } else {
+          showOnboarding();
+        }
+      }).catch(function (err) {
+        document.getElementById('loading').hidden = true;
+        showError('Could not load data: ' + err.message);
+      });
+    }
+
+    document.getElementById('onboarding-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = document.getElementById('onboarding-name').value.trim();
+      var odometer = parseInt(document.getElementById('onboarding-odometer').value, 10);
+      var fuel = parseInt(document.getElementById('onboarding-fuel').value, 10);
+      clearError();
+      createCar({
+        name: name,
+        startingOdometer: odometer,
+        startingFuelPercent: fuel,
+        setupDate: todayStr(),
+        fillups: []
+      }).then(function (row) {
+        state.row = row;
+        showApp();
+      }).catch(function (err) {
+        showError('Could not save setup: ' + err.message);
+      });
+    });
+
+    document.getElementById('fillup-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var form = e.target;
+      var data = state.row.data;
+      var odometer = parseInt(document.getElementById('fillup-odometer').value, 10);
+      var liters = parseFloat(document.getElementById('fillup-liters').value);
+      var cost = parseFloat(document.getElementById('fillup-cost').value);
+
+      var lastOdo = data.fillups.length ? data.fillups[data.fillups.length - 1].odometer : data.startingOdometer;
+      if (odometer <= lastOdo) {
+        showError('Odometer reading must be greater than the last recorded value (' + lastOdo.toLocaleString('en-IN') + ' km).');
+        return;
+      }
+
+      var updatedFillups = data.fillups.slice();
+      updatedFillups.push({ id: genId(), date: todayStr(), odometer: odometer, liters: liters, cost: cost });
+      var newData = {
+        name: data.name,
+        startingOdometer: data.startingOdometer,
+        startingFuelPercent: data.startingFuelPercent,
+        setupDate: data.setupDate,
+        fillups: updatedFillups
+      };
+      persistCarData(newData, function () {
+        form.reset();
+        renderAll();
+      });
+    });
+
+    init();
+  </script>
+</body>
+</html>
